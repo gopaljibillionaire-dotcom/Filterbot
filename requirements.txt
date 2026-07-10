@@ -1,0 +1,4 @@
+telethon==1.35.0
+aiosqlite==0.20.0
+qrcode==7.4.2
+pillow==10.3.0

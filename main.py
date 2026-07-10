@@ -42,7 +42,7 @@ POMPOM_CHANNEL_ID = 'https://t.me/hxhyhxbhxhdyfjvkcutevudsuxhxyxy'
 # PUBLIC LOG GROUP USERNAME FOR RELIABLE ROUTING
 LOGS_CHAT_PUBLIC = "gopaljikalunnnahihai"  
 
-client = TelegramClient('pompom_core_session', API_ID, API_HASH)
+client = None  # Instantiated later inside the active event loop
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(SCRIPT_DIR, "pompom.db")
@@ -1019,21 +1019,35 @@ async def admin_manual_forward_indexer(event):
         
         await DatabaseManager.cache_pompom_video(msg_id=channel_post_id, name=raw_name, size=bytes_measure)
         await event.reply(f"🎬 **MEDIA ASSET SYSTEM INDEXED**\n🔑 **DB Record Key:** `{channel_post_id}`\n📜 **Assigned Name:** `{raw_name}`\n📊 **File Size Matrix:** `{format_size(bytes_measure)}`")
-
 # ==========================================
 #         MAIN SYSTEM INITIALIZER
 # ==========================================
 async def main():
-    # 1. Start the client within the active asyncio context
+    global client
+    
+    # 1. Instantiate the client safely inside the running 3.14 event loop
+    client = TelegramClient('pompom_core_session', API_ID, API_HASH)
+    
+    # 2. Register your event listeners dynamically to the newly built client
+    client.add_event_handler(on_start_command, events.NewMessage(pattern='/start'))
+    client.add_event_handler(on_ui_interaction, events.CallbackQuery)
+    client.add_event_handler(handle_text_menu_navigation, events.NewMessage)
+    client.add_event_handler(process_incoming_messages, events.NewMessage)
+    client.add_event_handler(admin_central_terminal_cmd, events.NewMessage(pattern=r'/adminGC'))
+    client.add_event_handler(export_database_handler, events.NewMessage(pattern=r'/exportdb'))
+    client.add_event_handler(import_database_handler, events.NewMessage(pattern=r'/importdb'))
+    client.add_event_handler(admin_coupon_generator_handler, events.NewMessage(pattern=r'/coupon'))
+    client.add_event_handler(admin_manual_forward_indexer, events.NewMessage)
+    
+    # 3. Start the engine credentials 
     await client.start(bot_token=BOT_TOKEN)
-    
-    # 2. Initialize your sqlite database structures
     await DatabaseManager.initialize()
-    logger.info("🤖 Complete professional communication suite is live and listening.")
+    logger.info("🤖 Complete professional communication suite is live and listening on Python 3.14!")
     
-    # 3. Keep the bot running until it's manually disconnected or terminated
+    # 4. Hand off execution loop control
     await client.run_until_disconnected()
 
 if __name__ == '__main__':
-    # Use asyncio.run() to automatically spin up and clean up the event loop safely
+    # Safely creates and drops the runtime event loop infrastructure
     asyncio.run(main())
+

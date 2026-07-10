@@ -1024,10 +1024,16 @@ async def admin_manual_forward_indexer(event):
 #         MAIN SYSTEM INITIALIZER
 # ==========================================
 async def main():
+    # 1. Start the client within the active asyncio context
     await client.start(bot_token=BOT_TOKEN)
+    
+    # 2. Initialize your sqlite database structures
     await DatabaseManager.initialize()
     logger.info("🤖 Complete professional communication suite is live and listening.")
+    
+    # 3. Keep the bot running until it's manually disconnected or terminated
+    await client.run_until_disconnected()
 
 if __name__ == '__main__':
-    client.loop.run_until_complete(main())
-    client.run_until_disconnected()
+    # Use asyncio.run() to automatically spin up and clean up the event loop safely
+    asyncio.run(main())

@@ -39,26 +39,23 @@ REQUIRED_CHANNELS = [
 # UPDATED TO NEW DATABASE CHANNEL LINK
 POMPOM_CHANNEL_ID = 'https://t.me/hxhyhxbhxhdyfjvkcutevudsuxhxyxy'
 
-# PUBLIC LOG GROUP USERNAME FOR RELIABLE ROUTING
-LOGS_CHAT_PUBLIC = "https://t.me/+bi4thXsuA6NiNzcy"  
+# PUBLIC LOG GROUP LINK FOR RELIABLE ROUTING
+LOGS_CHAT_PUBLIC = "https://t.me/gopaljikalunnnahihathat"  
 
 # 🛠️ PYTHON 3.14+ CORE EVENT LOOP FIX
-# Explicitly initialize and register a dedicated event loop BEFORE Telethon instantiation
 try:
     loop = asyncio.get_event_loop()
 except RuntimeError:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-# Global initialization safe across Python 3.10 through Python 3.14+
 client = TelegramClient('pompom_core_session', API_ID, API_HASH, loop=loop)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(SCRIPT_DIR, "pompom.db")
 
-# Memory state storage to track user actions and maintenance status
 USER_STATES = {}
-SYSTEM_MAINTENANCE = False  # Global boolean flag for maintenance toggles
+SYSTEM_MAINTENANCE = False  
 
 # FIXED LIST OF 10 MATH CAPTCHAS
 MATH_CAPTCHAS = [
@@ -88,14 +85,12 @@ async def dispatch_system_log(caption_text: str, media_file=None):
         if media_file:
             await client.send_file(target_peer, file=media_file, caption=caption_text, parse_mode='markdown')
         else:
-            await client.send_message(target_peer, caption_text, parse_mode='markdown')
+            # FIXED: Correct parameter signature mapping for pure text packets
+            await client.send_message(target_peer, message=caption_text, parse_mode='markdown')
     except Exception as e:
         logger.error(f"❌🛠 [Log System] Failed forwarding broadcast packet: {e}")
 
 async def auto_delete_media_worker(chat_id, target_msg_id):
-    """
-    Waits exactly 2 minutes (120 seconds) and automatically deletes the media.
-    """
     await asyncio.sleep(120)
     try:
         await client.delete_messages(chat_id, target_msg_id)

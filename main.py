@@ -42,7 +42,16 @@ POMPOM_CHANNEL_ID = 'https://t.me/hxhyhxbhxhdyfjvkcutevudsuxhxyxy'
 # PUBLIC LOG GROUP USERNAME FOR RELIABLE ROUTING
 LOGS_CHAT_PUBLIC = "gopaljikalunnnahihai"  
 
-client = None  # Instantiated later inside the active event loop
+# 🛠️ PYTHON 3.14+ CORE EVENT LOOP FIX
+# Explicitly initialize and register a dedicated event loop BEFORE Telethon instantiation
+try:
+    loop = asyncio.get_event_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+# Global initialization safe across Python 3.10 through Python 3.14+
+client = TelegramClient('pompom_core_session', API_ID, API_HASH, loop=loop)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(SCRIPT_DIR, "pompom.db")
@@ -157,7 +166,6 @@ class DatabaseManager:
                 if row:
                     return "BANNED" if row['banned'] == 1 else False
             
-            # FEATURE INTEGRATED: Default starting points configuration shifted from 5 to 10
             await db.execute("""
                 INSERT INTO users (user_id, username, plan, points, referral_count, referred_by, banned, last_reward_time, premium_expiry)
                 VALUES (?, ?, 'Free', 10, 0, ?, 0, NULL, 'Never')
@@ -308,7 +316,6 @@ async def on_start_command(event):
     referrer_id = payload[1] if len(payload) > 1 and payload[1].isdigit() else None
     if referrer_id == user_id: referrer_id = None
         
-    # STEP 1: Strict Channel Membership Check First
     is_joined = await check_membership(event.sender_id)
     if not is_joined:
         channel_buttons = [[Button.url(f"📢 Join Channel {i+1}", ch['link'])] for i, ch in enumerate(REQUIRED_CHANNELS)]
@@ -319,7 +326,6 @@ async def on_start_command(event):
         )
         return
 
-    # If already a verified database member, bypass captcha restrictions completely
     existing_user = await DatabaseManager.get_user(user_id)
     if existing_user:
         if existing_user['banned'] == 1:
@@ -328,7 +334,6 @@ async def on_start_command(event):
         await send_humanized_dashboard(event.chat_id, user_id)
         return
 
-    # STEP 2: Separate Verification Request with Clean Tracking Node
     USER_STATES[user_id] = {
         "state": "TRIGGER_CAPTCHA_PROMPT",
         "referrer_id": referrer_id,
@@ -389,7 +394,6 @@ async def on_ui_interaction(event):
             await event.answer("⚠️ System is undergoing server-side maintenance updates.", alert=True)
         return
 
-    # Handle separate interactive math generation step
     if action.startswith(b'prompt_captcha_'):
         target_uid = action.decode('utf-8').split('_')[2]
         if user_id != target_uid:
@@ -434,7 +438,6 @@ async def on_ui_interaction(event):
         await client.send_message(event.chat_id, profile_text, parse_mode='markdown')
 
     elif action == b'premium_store':
-        # FEATURE INTEGRATED: Catalog modified to include Platinum Pass Tier criteria
         store_text = (
             f"🏪 **OFFICIAL PREMIUM STORE**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -539,7 +542,6 @@ async def on_ui_interaction(event):
                                 f"🗑️ **Notice:** This specific video object will self-destruct in exactly **2 minutes** due to system server limits!"
                     )
                     
-                    # TRIGGER AUTO-DELETION PIPELINE (2 MINUTES)
                     asyncio.create_task(auto_delete_media_worker(event.chat_id, media_msg.id))
                     
                     remaining_balance = await DatabaseManager.deduct_point(user_id)
@@ -610,7 +612,6 @@ async def handle_text_menu_navigation(event):
             "⚠️ **Notice:** Promotional keys are completely case-sensitive and expire immediately after the first usage."
         )
     elif text == "📖 How to Use":
-        # FEATURE INTEGRATED: Documentation update reflecting 10 Welcome Points and Platinum tier options
         guide_text = (
             "📖 **BOT INSTRUCTION MANUAL**\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -649,15 +650,13 @@ async def process_incoming_messages(event):
             await event.reply("⚠️🛠 Operation canceled: The platform has switched to maintenance mode.")
             return
 
-        # STEP 3: SOLVING THE SPECIFIC MATH CAPTCHA LIST SELECTIONS
         if isinstance(current_state, dict) and current_state.get("state") == "AWAITING_REFERRAL_CAPTCHA":
             user_ans = event.text.strip() if event.text else ""
             if user_ans == current_state["ans"]:
                 referrer_id = current_state["referrer_id"]
                 username = current_state["username"]
-                USER_STATES.pop(user_id, None)  # Wipe matching parameters instantly
+                USER_STATES.pop(user_id, None)  
                 
-                # Double check channel requirement matches before appending database parameters
                 is_sub = await check_membership(event.sender_id)
                 if not is_sub:
                     await event.reply("🛑 **Verification Failed:** It looks like you unjoined our partner channels while typing the captcha. Run /start again.")
@@ -686,10 +685,8 @@ async def process_incoming_messages(event):
                     )
                     await dispatch_system_log(ref_log_msg)
                 
-                # Render active app panel metrics
                 await send_humanized_dashboard(event.chat_id, user_id)
             else:
-                # Select a brand new item out of the 10 math queries on failure
                 chosen_captcha = random.choice(MATH_CAPTCHAS)
                 USER_STATES[user_id]["ans"] = chosen_captcha["answer"]
                 await event.reply(
@@ -745,7 +742,6 @@ async def process_incoming_messages(event):
                     f"👤 **Username:** @{event.sender.username or 'N/A'}\n"
                     f"🛠️ **Action Required:** Verify the uploaded invoice file below:",
                     file=event.message.photo,
-                    # FEATURE INTEGRATED: Dynamic tracking added to register Platinum pass approvals directly via manual validation matrix
                     buttons=[
                         [Button.inline("🥈 Silver Pass", f"adm_v_Silver_{user_id}"), Button.inline("🥇 Gold Pass", f"adm_v_Gold_{user_id}")],
                         [Button.inline("💎 Platinum Pass", f"adm_v_Platinum_{user_id}")],
@@ -933,8 +929,6 @@ async def export_database_handler(event):
 @client.on(events.NewMessage(pattern=r'/importdb'))
 async def import_database_handler(event):
     if event.sender_id not in ADMIN_IDS: return
-    
-    # Verify if the admin replied directly to a valid document file
     if not event.is_reply:
         await event.reply("⚠️ **Usage:** Reply to a valid `.db` file with `/importdb` to swap configurations.")
         return
@@ -946,10 +940,7 @@ async def import_database_handler(event):
 
     status_msg = await event.reply("⏳ *Stopping queries and overwriting live database storage layer...*")
     try:
-        # Download the new database over the old path
         await client.download_media(replied_msg.document, file=DB_FILE)
-        
-        # Flush connection tables by reinitializing structures
         await DatabaseManager.initialize()
         u, m, b, p = await DatabaseManager.get_system_stats()
         
@@ -1019,35 +1010,15 @@ async def admin_manual_forward_indexer(event):
         
         await DatabaseManager.cache_pompom_video(msg_id=channel_post_id, name=raw_name, size=bytes_measure)
         await event.reply(f"🎬 **MEDIA ASSET SYSTEM INDEXED**\n🔑 **DB Record Key:** `{channel_post_id}`\n📜 **Assigned Name:** `{raw_name}`\n📊 **File Size Matrix:** `{format_size(bytes_measure)}`")
+
 # ==========================================
 #         MAIN SYSTEM INITIALIZER
 # ==========================================
 async def main():
-    global client
-    
-    # 1. Instantiate the client safely inside the running 3.14 event loop
-    client = TelegramClient('pompom_core_session', API_ID, API_HASH)
-    
-    # 2. Register your event listeners dynamically to the newly built client
-    client.add_event_handler(on_start_command, events.NewMessage(pattern='/start'))
-    client.add_event_handler(on_ui_interaction, events.CallbackQuery)
-    client.add_event_handler(handle_text_menu_navigation, events.NewMessage)
-    client.add_event_handler(process_incoming_messages, events.NewMessage)
-    client.add_event_handler(admin_central_terminal_cmd, events.NewMessage(pattern=r'/adminGC'))
-    client.add_event_handler(export_database_handler, events.NewMessage(pattern=r'/exportdb'))
-    client.add_event_handler(import_database_handler, events.NewMessage(pattern=r'/importdb'))
-    client.add_event_handler(admin_coupon_generator_handler, events.NewMessage(pattern=r'/coupon'))
-    client.add_event_handler(admin_manual_forward_indexer, events.NewMessage)
-    
-    # 3. Start the engine credentials 
     await client.start(bot_token=BOT_TOKEN)
     await DatabaseManager.initialize()
     logger.info("🤖 Complete professional communication suite is live and listening on Python 3.14!")
-    
-    # 4. Hand off execution loop control
     await client.run_until_disconnected()
 
 if __name__ == '__main__':
-    # Safely creates and drops the runtime event loop infrastructure
-    asyncio.run(main())
-
+    loop.run_until_complete(main())

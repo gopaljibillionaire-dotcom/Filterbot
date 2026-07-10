@@ -40,7 +40,7 @@ REQUIRED_CHANNELS = [
 POMPOM_CHANNEL_ID = 'https://t.me/hxhyhxbhxhdyfjvkcutevudsuxhxyxy'
 
 # PUBLIC LOG GROUP USERNAME FOR RELIABLE ROUTING
-LOGS_CHAT_PUBLIC = "gopaljikalunnnahihai"  
+LOGS_CHAT_PUBLIC = "https://t.me/+bi4thXsuA6NiNzcy"  
 
 # 🛠️ PYTHON 3.14+ CORE EVENT LOOP FIX
 # Explicitly initialize and register a dedicated event loop BEFORE Telethon instantiation

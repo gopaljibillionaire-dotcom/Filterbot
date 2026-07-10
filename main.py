@@ -10,28 +10,6 @@ import aiosqlite
 import telethon
 from telethon import TelegramClient, events, functions, types, Button
 
-# --- 🔍 FUZZY MATCHING LOGIC 🔍 ---
-def clean_string(text):
-    text = re.sub(r'[\._\-]', ' ', text.lower())
-    return re.sub(r'\s+', ' ', text).strip()
-
-def calculate_similarity(s1, s2):
-    s1, s2 = clean_string(s1), clean_string(s2)
-    if not s1 or not s2: return 0.0
-    if s1 in s2 or s2 in s1: return 0.85
-    
-    words1, words2 = s1.split(), s2.split()
-    matches = sum(1 for w in words1 if any(w in target or target in w for target in words2))
-    return matches / max(len(words1), len(words2))
-
-def format_size(bytes_size):
-    if not bytes_size: return "Unknown Size"
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if bytes_size < 1024.0:
-            return f"{bytes_size:.2f} {unit}"
-        bytes_size /= 1024.0
-    return f"{bytes_size:.2f} TB"
-
 # --- 📝 CONFIGURATION LOGING LAYER 📝 ---
 logging.basicConfig(
     level=logging.INFO,
@@ -57,7 +35,13 @@ REQUIRED_CHANNELS = [
 CHANNEL_LINK = "https://t.me/yagamicorporation"
 MOVIE_CHANNEL_ID = -1002107962104        
 
-client = TelegramClient('movie_advanced_session', API_ID, API_HASH)
+# 🔥 CRITICAL PYTHON 3.14 EVENT LOOP FIX 🔥
+# This instantiates a default loop before Telethon references it globally.
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
+# Initialize client using the initialized global loop reference
+client = TelegramClient('movie_advanced_session', API_ID, API_HASH, loop=loop)
 
 # 📂 ABSOLUTE PATH FIX: Guarantees your database is read correctly instead of blank creation
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -65,6 +49,28 @@ DB_FILE = os.path.join(SCRIPT_DIR, "bot_production.db")
 
 # 🧠 Pagination Dynamic Cache Mapping (Key: user_id)
 PAGINATION_CACHE = {}
+
+# --- 🔍 FUZZY MATCHING LOGIC 🔍 ---
+def clean_string(text):
+    text = re.sub(r'[\._\-]', ' ', text.lower())
+    return re.sub(r'\s+', ' ', text).strip()
+
+def calculate_similarity(s1, s2):
+    s1, s2 = clean_string(s1), clean_string(s2)
+    if not s1 or not s2: return 0.0
+    if s1 in s2 or s2 in s1: return 0.85
+    
+    words1, words2 = s1.split(), s2.split()
+    matches = sum(1 for w in words1 if any(w in target or target in w for target in words2))
+    return matches / max(len(words1), len(words2))
+
+def format_size(bytes_size):
+    if not bytes_size: return "Unknown Size"
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if bytes_size < 1024.0:
+            return f"{bytes_size:.2f} {unit}"
+        bytes_size /= 1024.0
+    return f"{bytes_size:.2f} TB"
 
 # ==========================================
 #         🗄️ DATABASE SYSTEM ABSTRACTS
@@ -804,11 +810,8 @@ if __name__ == '__main__':
     print("🚀 Running Advanced Architecture Split Channel Movie Bot System...")
     print("---------------------------------------------------------")
     
-    # 🔧 FIX: Explicitly create and allocate a dedicated event loop instance for the startup thread
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
     try:
+        # Run bootstrap safely on our globally mapped loop environment
         loop.run_until_complete(main_environment_bootstrap())
         client.run_until_disconnected()
     except KeyboardInterrupt:

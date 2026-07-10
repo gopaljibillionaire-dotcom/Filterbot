@@ -7,6 +7,7 @@ import asyncio
 import random
 from datetime import datetime, timedelta
 import aiosqlite
+import telethon
 from telethon import TelegramClient, events, functions, types, Button
 
 # --- 🔍 FUZZY MATCHING LOGIC 🔍 ---
@@ -543,7 +544,6 @@ async def on_interactive_callback(event):
         except ModuleNotFoundError:
             await event.reply(
                 "⚠️ **UPI QR Code system module missing.**\n"
-                "Please open Pydroid 3 Menu -> PIP -> Search and install `qrcode` to activate QR asset configurations on your device.\n\n"
                 f"Alternative direct copy string payload:\n`{upi_payload}`"
             )
 
@@ -803,5 +803,13 @@ if __name__ == '__main__':
     print("---------------------------------------------------------")
     print("🚀 Running Advanced Architecture Split Channel Movie Bot System...")
     print("---------------------------------------------------------")
-    client.loop.run_until_complete(main_environment_bootstrap())
-    client.run_until_disconnected()
+    
+    # 🔧 FIX: Explicitly create and allocate a dedicated event loop instance for the startup thread
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    try:
+        loop.run_until_complete(main_environment_bootstrap())
+        client.run_until_disconnected()
+    except KeyboardInterrupt:
+        print("🛑 System runtime disconnected manually.")

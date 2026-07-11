@@ -1,6 +1,7 @@
 import os
 import re
 import io
+import json
 import logging
 import asyncio
 import random
@@ -82,7 +83,6 @@ def format_size(bytes_size):
 
 async def dispatch_system_log(caption_text: str, media_file=None):
     try:
-        # Direct structural routing to the logs channel via ID
         if media_file:
             await client.send_file(LOGS_CHANNEL_ID, file=media_file, caption=caption_text, parse_mode='markdown')
         else:
@@ -667,7 +667,6 @@ async def process_incoming_messages(event):
                 
                 await event.reply("✅ **Verification Successful!** Full bot authority granted.")
                 
-                # Setup details for New User entry
                 ref_username = "None (Direct Access)"
                 if reg and referrer_id:
                     try: await client.send_message(int(referrer_id), f"🎉 **Referral Success!** A new user joined via your link. `+3 Points` credited successfully!")
@@ -676,7 +675,6 @@ async def process_incoming_messages(event):
                     referrer_data = await DatabaseManager.get_user(referrer_id)
                     ref_username = f"@{referrer_data['username']}" if (referrer_data and referrer_data['username'] != "No Username") else f"`{referrer_id}`"
 
-                # 📢 NEW USER LOG FOR CHANNEL
                 new_user_log = (
                     f"👤 **NEW USER JOINED & VERIFIED**\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -712,7 +710,6 @@ async def process_incoming_messages(event):
                     f"🪙 Credited `+{coupon_status} Balance Points` into your wallet database!"
                 )
                 
-                # 📢 COUPON USED LOG FOR CHANNEL
                 coupon_use_log = (
                     f"🎫 ✅ **PROMO VOUCHER REDEEMED**\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -726,7 +723,6 @@ async def process_incoming_messages(event):
             elif coupon_status == "EXPIRED":
                 await event.reply("❌ **COUPON EXPIRED:** This promotional sequence key has already been consumed.")
                 
-                # 📢 COUPON EXPIRED TRY LOG FOR CHANNEL
                 coupon_exp_log = (
                     f"🎫 ⚠️ **EXPIRED COUPON ATTEMPT**\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -795,7 +791,6 @@ async def handle_successful_star_payment(event):
                     try: await client.send_message(admin_id, f"⭐ `[STARS TRANSACTION LOG]`\n👤 **User ID:** `{uid}`\n👑 **Tier Activated:** `{tier}`")
                     except Exception: pass
                 
-                # 📢 AUTOMATED PREMIUM ACTIVATION CHANNEL LOG
                 star_log = (
                     f"⭐ 💳 **AUTOMATED STARS PAYMENT CLEARED**\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -835,7 +830,6 @@ async def handle_admin_verdict(event):
             first_name = "User"
             username_field = "N/A"
 
-        # 📢 PREMIUM USER CHANNEL LOG
         premium_log = (
             f"👑 💎 **PREMIUM TIER ACTIVATED MANUALLY**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -874,7 +868,7 @@ async def admin_central_terminal_cmd(event):
         f"🪙 `/adminGC addpoints <id> <amount>`\n"
         f"🎫 `/coupon <count> <points_per_coupon>`\n"
         f"📢 `/adminGC broadcast <your message>`\n"
-        f"📦 `/exportdb` (Backup full pompom.db file)"
+        f"📦 `/exportdb` (Backup full structure to portable JSON)"
     )
     
     if len(raw_args) == 1:
@@ -926,29 +920,71 @@ async def admin_central_terminal_cmd(event):
             except Exception: pass
         await prog.edit(f"🚀 **Transmission Terminated:** Deliveries dispatched to `{sent}` terminal ports successfully.")
 
-# --- DIRECT BACKUP MANAGEMENT SYSTEM ---
+# ==========================================
+#  AUTOMATED DATA EXPORT & IMPORT BACKUP SYSTEM
+# ==========================================
 @client.on(events.NewMessage(pattern=r'/exportdb'))
 async def export_database_handler(event):
     if event.sender_id not in ADMIN_IDS: return
-    if not os.path.exists(DB_FILE):
-        await event.reply("📂❌ **Error:** No existing database file found on the disk.")
-        return
-        
+    
+    await event.reply("⏳ *Extracting system matrices and compiling data streams...*")
+    
     try:
-        await event.reply("⏳ *Extracting structural database assets...*")
+        backup_data = {
+            "users": [],
+            "payments": [],
+            "pompoms": [],
+            "coupons": []
+        }
+        
+        async with aiosqlite.connect(DB_FILE) as db:
+            db.row_factory = aiosqlite.Row
+            
+            # Extract Users Table
+            async with db.execute("SELECT * FROM users") as cursor:
+                async for row in cursor:
+                    backup_data["users"].append(dict(row))
+                    
+            # Extract Payments Table
+            async with db.execute("SELECT * FROM payments") as cursor:
+                async for row in cursor:
+                    backup_data["payments"].append(dict(row))
+                    
+            # Extract Pompoms Table (Videos)
+            async with db.execute("SELECT * FROM pompoms") as cursor:
+                async for row in cursor:
+                    backup_data["pompoms"].append(dict(row))
+                    
+            # Extract Coupons Table
+            async with db.execute("SELECT * FROM coupons") as cursor:
+                async for row in cursor:
+                    backup_data["coupons"].append(dict(row))
+
+        # Compile data to a fast memory string layout
+        json_str = json.dumps(backup_data, indent=2)
+        json_bytes = io.BytesIO(json_str.encode('utf-8'))
+        json_bytes.name = f"pompom_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        
         await client.send_file(
             event.chat_id,
-            file=DB_FILE,
-            caption=f"📦 **POMPOM BACKUP SECURE NODE**\n\n🗓️ **Generated On:** `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`\n⚠️ Keep this file safe to recover assets in case of a server reset."
+            file=json_bytes,
+            caption=f"📦 **STUDIO MEDIA BACKUP SECURE NODE**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🗓️ **Generated On:** `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`\n"
+                    f"👥 Users: `{len(backup_data['users'])}` | 🎬 Videos: `{len(backup_data['pompoms'])}`\n"
+                    f"🎫 Coupons: `{len(backup_data['coupons'])}` | 💳 Payments: `{len(backup_data['payments'])}`\n\n"
+                    f"⚡ *To restore this backup, reply directly to this file with:* `/importdb`"
         )
     except Exception as e:
-        await event.reply(f"❌ **Export Failed:** {e}")
+        logger.error(f"Export Failure: {e}")
+        await event.reply(f"❌ **Export Failed:** Runtime error during extraction: {e}")
+
 
 @client.on(events.NewMessage(pattern=r'/importdb'))
 async def import_database_handler(event):
     if event.sender_id not in ADMIN_IDS: return
     if not event.is_reply:
-        await event.reply("⚠️ **Usage:** Reply to a valid `.db` file with `/importdb` to swap configurations.")
+        await event.reply("⚠️ **Usage Guide:** Reply directly to a valid text/json backup file with `/importdb` to restore data structures.")
         return
         
     replied_msg = await event.get_reply_message()
@@ -956,22 +992,71 @@ async def import_database_handler(event):
         await event.reply("❌ **Error:** The target message does not contain a valid backup document container.")
         return
 
-    status_msg = await event.reply("⏳ *Stopping queries and overwriting live database storage layer...*")
+    status_msg = await event.reply("⏳ *Downloading backup file and parsing data matrix...*")
+    
     try:
-        await client.download_media(replied_msg.document, file=DB_FILE)
-        await DatabaseManager.initialize()
-        u, m, b, p = await DatabaseManager.get_system_stats()
+        # Pull file data into a quick memory stream buffer
+        file_buffer = io.BytesIO()
+        await client.download_media(replied_msg.document, file=file_buffer)
+        file_buffer.seek(0)
         
+        # Load and parse the contents
+        raw_data = json.loads(file_buffer.read().decode('utf-8'))
+        
+        # Key validation check to confirm structure integrity
+        if not all(k in raw_data for k in ["users", "payments", "pompoms", "coupons"]):
+            await status_msg.edit("❌ **Import Aborted:** Invalid database schema inside JSON structure.")
+            return
+
+        await status_msg.edit("⚡ *Clearing live database tables and writing records...*")
+
+        async with aiosqlite.connect(DB_FILE) as db:
+            # Completely flush old datasets safely to drop collision bounds
+            await db.execute("DELETE FROM users")
+            await db.execute("DELETE FROM payments")
+            await db.execute("DELETE FROM pompoms")
+            await db.execute("DELETE FROM coupons")
+            
+            # Fast structural array packaging
+            if raw_data["users"]:
+                await db.executemany("""
+                    INSERT INTO users (user_id, username, plan, points, referral_count, referred_by, banned, last_reward_time, premium_expiry)
+                    VALUES (:user_id, :username, :plan, :points, :referral_count, :referred_by, :banned, :last_reward_time, :premium_expiry)
+                """, raw_data["users"])
+                
+            if raw_data["payments"]:
+                await db.executemany("""
+                    INSERT INTO payments (tx_id, user_id, plan_name, price, status, timestamp)
+                    VALUES (:tx_id, :user_id, :plan_name, :price, :status, :timestamp)
+                """, raw_data["payments"])
+                
+            if raw_data["pompoms"]:
+                await db.executemany("""
+                    INSERT INTO pompoms (msg_id, file_name, file_size)
+                    VALUES (:msg_id, :file_name, :file_size)
+                """, raw_data["pompoms"])
+                
+            if raw_data["coupons"]:
+                await db.executemany("""
+                    INSERT INTO coupons (coupon_code, points_value, is_used, created_by, timestamp)
+                    VALUES (:coupon_code, :points_value, :is_used, :created_by, :timestamp)
+                """, raw_data["coupons"])
+                
+            await db.commit()
+
         await status_msg.edit(
-            f"✅ **DATABASE SWAPPED SUCCESSFULLY**\n"
+            f"✅ **DATABASE RESTORE COMPLETED IN SECONDS**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"👥 Users Restored: `{u}`\n"
-            f"🎬 Videos Synced: `{m}`\n"
-            f"🚫 Suspended Profiles: `{b}`\n\n"
-            f"🚀 *All systems synchronized and fully live!*"
+            f"👥 Users Restored: `{len(raw_data['users'])}`\n"
+            f"🎬 Videos Synced: `{len(raw_data['pompoms'])}`\n"
+            f"🎫 Coupons Loaded: `{len(raw_data['coupons'])}`\n"
+            f"💳 Orders Restored: `{len(raw_data['payments'])}`\n\n"
+            f"🚀 *All data has been safely merged into live operations!*"
         )
+        
     except Exception as e:
-        await status_msg.edit(f"❌ **Import Failed:** Engine failed critical recovery: {e}")
+        logger.error(f"Import Failure: {e}")
+        await status_msg.edit(f"❌ **Import Failed:** Engine failed critical database recovery: {e}")
 
 # --- COUPON CREATOR ---
 @client.on(events.NewMessage(pattern=r'/coupon'))
@@ -1006,7 +1091,6 @@ async def admin_coupon_generator_handler(event):
         f"✨ *Voucher Parameters:* Codes are completely single-use and disappear instantly upon processing validation."
     )
     
-    # 📢 COUPONS GENERATED CHANNEL LOG
     coupon_gen_log = (
         f"🎫 ⚙️ **NEW SYSTEM PROMO KEYS COMPILED**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
